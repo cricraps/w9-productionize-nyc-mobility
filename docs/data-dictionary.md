@@ -17,7 +17,7 @@ catalog, `nyc_mobility`:
 | `nyc_mobility.bi_visualization` | — | Dashboard-ready views |
 | `nyc_mobility.validation` / `nyc_mobility.dq_visualization` | — | Data quality checks |
 
-The `mart` schema implements a star schema: one fact table (`fact_trip`) surrounded by four
+The `mart` schema implements a snowflake schema: one fact table (`fact_trip`) surrounded by four
 dimension tables (`dim_advisory`, `dim_date`, `dim_weather`, `dim_zone`).
 
 ## Conventions
