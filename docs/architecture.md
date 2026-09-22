@@ -80,11 +80,11 @@ df = spark.read.parquet(
 
 ## Gold Layer — `03_mart/`
 
-**Purpose:** Transforms cleaned data into a **dimensional model** (star schema) optimized for analytics and reporting. This layer contains dimension and fact tables joining trip, weather, zone, and advisory data.
+**Purpose:** Transforms cleaned data into a **dimensional model** (snowflake schema) optimized for analytics and reporting. This layer contains dimension and fact tables joining trip, weather, zone, and advisory data.
 
 **Characteristics:**
 
-- Star schema design (dimensions + facts)
+- Snowflake schema design (dimensions + facts)
 - Business logic and aggregations applied (trip duration, weather conditions at trip time, advisory/incident flags, etc.)
 - Optimized for query performance and reporting tools
 
