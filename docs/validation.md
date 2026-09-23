@@ -1,8 +1,7 @@
 # Validation and data quality
 
-One section per source. Each engineer owns their own section: the rules that run against
-their tables, how the checks are recovered when they fail, what is monitored, and who owns
-the result. Add your section alongside the others rather than editing someone else's.
+One section per source: the rules that run against each set of tables, how they are
+recovered when they fail, what is monitored, and who owns the result.
 
 Status values are shared across all sources: PASS at zero failures, WARN under 5 percent,
 FAIL at or above. Checks marked strict skip the percentage and go straight to FAIL on any
