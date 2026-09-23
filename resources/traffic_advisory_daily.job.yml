@@ -1,0 +1,52 @@
+# traffic_advisory_daily
+# Job definition for the traffic advisory source. Raw, then clean, then validation.
+# Created 23 Sep 2026 through the job YAML editor, job id 359007123675808.
+# The schedule is paused on purpose. Resume it only after a green smoke run.
+
+resources:
+  jobs:
+    traffic_advisory_daily:
+      name: traffic_advisory_daily
+      description: Daily scrape of the NYC DOT weekly traffic advisory page. Raw, then clean, then validation. The page keeps no archive, so a missed day cannot be backfilled.
+      max_concurrent_runs: 1
+      tags:
+        owner: kinah
+        source: traffic_advisory
+        layers: raw-clean-validation
+      email_notifications:
+        on_failure:
+          - tolentino.czekinah@gmail.com
+      schedule:
+        quartz_cron_expression: 0 0 1 * * ?
+        timezone_id: Asia/Manila
+        pause_status: PAUSED
+      tasks:
+        - task_key: raw
+          description: Scrape the DOT page, land the HTML, MERGE into raw.traffic_advisory
+          notebook_task:
+            notebook_path: /Users/tolentino.czekinah@gmail.com/04_traffic_advisory_raw
+            source: WORKSPACE
+          max_retries: 2
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
+          timeout_seconds: 1800
+        - task_key: clean
+          description: Type 2 MERGE into clean.traffic_advisory
+          depends_on:
+            - task_key: raw
+          notebook_task:
+            notebook_path: /Users/tolentino.czekinah@gmail.com/04_traffic_advisory_clean
+            source: WORKSPACE
+          max_retries: 1
+          timeout_seconds: 1800
+        - task_key: validation
+          description: Ten DQ checks into validation.traffic_advisory_validation
+          depends_on:
+            - task_key: clean
+          notebook_task:
+            notebook_path: /Users/tolentino.czekinah@gmail.com/04_traffic_advisory_validation
+            source: WORKSPACE
+          max_retries: 0
+          timeout_seconds: 1800
+      queue:
+        enabled: true
