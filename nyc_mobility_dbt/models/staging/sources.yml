@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: raw
+    database: nyc_mobility
+    schema: raw
+    tables:
+      - name: green_03_2026
+      - name: green_04_2026
+      - name: green_05_2026
