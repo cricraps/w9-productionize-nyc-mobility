@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: stg_traffic_advisory_current
+    description: The newest scrape of the DOT page, keyed and typed. One row per advisory entry.
+    columns:
+      - name: closure_bk
+        description: Business key, section + location + label + text. No scrape date in it.
+        data_tests:
+          - not_null
+          # Accuracy check. Every advisory in the newest scrape must exist in clean.
+          - relationships:
+              arguments:
+                to: ref('traffic_advisory_clean')
+                field: closure_bk

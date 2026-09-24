@@ -1,0 +1,28 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Landed by the Python scrape in 04_traffic_advisory_raw. dbt starts here.
+    database: nyc_mobility
+    schema: raw
+    tables:
+      - name: traffic_advisory
+        description: >
+          One row per advisory entry per scrape of nyc.gov weektraf.shtml.
+          MERGE on advisory_sk, so a rerun of the same scrape date inserts zero rows.
+        config:
+          # OURS freshness signal. Did the scrape run?
+          loaded_at_field: cast(scrape_date as timestamp)
+          freshness:
+            warn_after: {count: 1, period: day}
+            error_after: {count: 2, period: day}
+        columns:
+          - name: advisory_sk
+            description: SHA-256 over the entry fields plus scrape_date. Raw MERGE key.
+            data_tests:
+              - unique
+              - not_null
+          - name: scrape_date
+            description: Date the page was scraped.
+            data_tests:
+              - not_null
