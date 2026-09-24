@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: traffic_advisory_clean
+    description: >
+      One row per advisory with first_seen_scrape, last_seen_scrape, is_current and
+      times_seen. Same shape as nyc_mobility.clean.traffic_advisory. Built in the dbt
+      dev schema so the notebook-written table is never touched.
+    columns:
+      - name: closure_bk
+        description: Business key and merge key. Join key for everything downstream.
+        data_tests:
+          - unique
+          - not_null
+      - name: borough
+        description: Primary borough parsed from the section name. Crossings for the bridge section.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island', 'Crossings']
+              config:
+                severity: warn
+      - name: is_current
+        data_tests:
+          - not_null
+      - name: times_seen
+        data_tests:
+          - not_null
