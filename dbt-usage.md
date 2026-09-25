@@ -1,10 +1,10 @@
-# nyc_mobility_dbt
+# Using dbt 
 
-A dbt project built to test whether dbt should replace part of the NYC Mobility pipeline's clean/check steps. This is a proof-of-concept, not the pipeline itself.
+This is a documentation of how the team explored the usage of dbt in the existing pipeline, what was tested, the verdict, and the recommendation. 
 
 ## Verdict
 
-**Not now, and not for everything.** We're keeping the pipeline we have. dbt is solid at building and testing tables, but it can't pull data in, and rewriting every notebook into SQL costs more right now than it gives back. It earns a place later, once we're building new reporting tables on top of the clean layer.
+**Not now, and not for everything.** The team has decided to keep the pipeline we have. dbt is solid at building and testing tables, but it can't pull data in, and rewriting every notebook into SQL costs more right now than it gives back. It needs more exploration, and was agreed to work better once we're building new reporting tables on top of the clean layer.
 
 ## What was tested
 
