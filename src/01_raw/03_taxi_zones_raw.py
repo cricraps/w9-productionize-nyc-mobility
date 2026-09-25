@@ -4,42 +4,35 @@
 # environment_version = "5"
 # ///
 # DBTITLE 1,Taxi zones
-from pyspark.sql import functions as F
 from datetime import datetime
 import os
+
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+
+spark = SparkSession.builder.getOrCreate()
 
 # Path to taxi zones data
 taxi_zones_path = "/Volumes/workspace/default/ftw-b12-r2/groups/week-08/group-f/taxi_zones/"
 
-# Find the data file
-files = [f for f in os.listdir(taxi_zones_path) if os.path.isfile(os.path.join(taxi_zones_path, f))]
+# ...
 
-if not files:
-    raise FileNotFoundError(f"No files found in {taxi_zones_path}")
-
-# Assume first file is the data file
-data_file = files[0]
-full_path = os.path.join(taxi_zones_path, data_file)
-extension = os.path.splitext(data_file)[1].lower()
-
-print(f"Reading: {data_file}")
-print(f"Format: {extension}\n")
-
-# Read based on file extension
-if extension == '.csv':
+if extension == ".csv":
     df = spark.read.csv(full_path, header=True, inferSchema=True)
-elif extension == '.json':
+elif extension == ".json":
     df = spark.read.json(full_path)
-elif extension == '.parquet':
+elif extension == ".parquet":
     df = spark.read.parquet(full_path)
 else:
-    # Try CSV as default
     df = spark.read.csv(full_path, header=True, inferSchema=True)
 
 print("Schema:")
 df.printSchema()
-print("\nRow count: {df.count():,}")
+print(f"\nRow count: {df.count():,}")
 
+# ...
+
+spark.table("nyc_mobility.raw.taxi_zones").limit(20).show(truncate=False)
 # Generate batch_id
 batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
