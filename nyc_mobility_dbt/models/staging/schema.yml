@@ -1,0 +1,24 @@
+version: 2
+models:
+  - name: stg_green_taxi
+    columns:
+      - name: lpep_pickup_datetime
+        tests: [not_null]
+      - name: lpep_dropoff_datetime
+        tests: [not_null]
+      - name: PULocationID
+        tests: [not_null]
+      - name: DOLocationID
+        tests: [not_null]
+      - name: total_amount
+        tests: [not_null]
+      - name: RatecodeID
+        tests:
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 99]
+              config: {severity: error}
+      - name: VendorID
+        tests:
+          - accepted_values:
+              values: [1, 2, 7]
+              config: {severity: warn}
