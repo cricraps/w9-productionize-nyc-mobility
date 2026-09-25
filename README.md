@@ -1,6 +1,6 @@
 # Productionizing NYC Mobility Pipeline
 
-We created a mirror cloned repo to show how the pipeline from Week 8 has underwent changes that answers the Part 1 requirements of versioning and deploying, orchestrating, recovering, monitoring, and governing.
+We created this mirror cloned repo carrying over the previous history of Week 8 to show how the pipeline has underwent changes of versioning and deploying, orchestrating, recovering, monitoring, and governing.  
 
 For architecture, the data model, and how to run the full pipeline end to end, see the main [`README.md`](../README.md); this file is the production layer on top of it.
 
