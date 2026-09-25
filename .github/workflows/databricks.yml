@@ -1,0 +1,276 @@
+# databricks.yml
+# Databricks Asset Bundle for cricraps/w9-productionize-nyc-mobility
+#
+# Deploys the Bronze -> Profile -> Silver -> Silver Validation -> Gold ->
+# Visualisation -> DQ Dashboard pipeline as a single Databricks Job, with
+# task dependencies matching the "Execution" table in the repo README.
+#
+# Deploy:   databricks bundle deploy -t dev
+# Run:      databricks bundle run nyc_mobility_pipeline -t dev
+#
+# ASSUMPTIONS TO VERIFY BEFORE DEPLOYING (see inline comments marked CHECK):
+#   1. Exact filenames in src/04_visualisation/ were truncated on GitHub's
+#      file list UI - inferred here from the matching table names in the
+#      README's "How each business question is built" section.
+#   2. src/05_validation/01_profile_source_data.sql.dbquery and
+#      03_weather_validation.dbquery are Databricks SQL Editor "Query"
+#      objects, not notebooks - modelled here as sql_task/file tasks.
+#      If your workspace exported them differently, switch to notebook_task.
+#   3. src/05_validation/06_clean_dq_checks_dashboard has no file extension
+#      in the listing - likely a Lakeview dashboard (.lvdash.json). Modelled
+#      as a dashboard task; adjust to notebook_task if it's actually a notebook.
+#   4. Cluster sizing (node_type_id, spark_version, worker count) is a
+#      starting point only - set these to match the ftw-b12-r2 environment's
+#      approved instance types.
+
+bundle:
+  name: nyc-mobility-pipeline
+
+variables:
+  catalog:
+    description: Unity Catalog catalog this pipeline reads/writes (the only catalog it should touch)
+    default: nyc_mobility
+  volume_path:
+    description: Approved landing-zone Volume path for raw source files
+    default: /Volumes/workspace/default/ftw-b12-r2/groups/week-08/group-f
+  notification_email:
+    description: Email to notify on job failure
+    default: your-team-alias@example.com
+
+# ---------------------------------------------------------------------------
+# Targets - adjust host per environment. `dev` deploys to each developer's
+# own workspace path; `prod` deploys the reviewed main branch to a shared job.
+# ---------------------------------------------------------------------------
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://<your-workspace-instance>.cloud.databricks.com  # CHECK: set to ftw-b12-r2 workspace URL
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+
+  prod:
+    mode: production
+    workspace:
+      host: https://<your-workspace-instance>.cloud.databricks.com  # CHECK: set to ftw-b12-r2 workspace URL
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      user_name: ${var.notification_email}  # CHECK: or use a service principal in prod
+
+# ---------------------------------------------------------------------------
+# Job cluster shared by every task. Traffic advisory tasks need requests +
+# beautifulsoup4 for the HTML scrape.
+# ---------------------------------------------------------------------------
+resources:
+  jobs:
+    nyc_mobility_pipeline:
+      name: nyc_mobility_pipeline
+      description: >
+        NYC Mobility Data Pipeline - ingest, clean, model and validate green
+        taxi, weather, taxi zone and traffic advisory data into the
+        nyc_mobility Unity Catalog (Bronze -> Silver -> Gold + Validation).
+
+      email_notifications:
+        on_failure:
+          - ${var.notification_email}
+
+      # Uncomment to run the traffic scrape + full pipeline on a regular
+      # cadence, per the README's idempotency/archival note.
+      # schedule:
+      #   quartz_cron_expression: "0 0 6 ? * MON"   # every Monday 06:00
+      #   timezone_id: America/New_York
+      #   pause_status: PAUSED   # flip to UNPAUSED when ready to go live
+
+      job_clusters:
+        - job_cluster_key: pipeline_cluster
+          new_cluster:
+            spark_version: 14.3.x-scala2.12       # CHECK: match ftw-b12-r2 approved runtime
+            node_type_id: i3.xlarge                # CHECK: match ftw-b12-r2 approved instance type
+            num_workers: 2
+            data_security_mode: SINGLE_USER
+            spark_conf:
+              spark.databricks.unityCatalog.enabled: "true"
+            custom_tags:
+              project: nyc-mobility-pipeline
+
+      tasks:
+        # --- Bronze (Step 1): four independent source loads, run in parallel ---
+        - task_key: raw_green_taxi
+          job_cluster_key: pipeline_cluster
+          notebook_task:
+            notebook_path: ../src/01_raw/01_green_taxi_raw.py
+
+        - task_key: raw_weather
+          job_cluster_key: pipeline_cluster
+          notebook_task:
+            notebook_path: ../src/01_raw/02_weather_raw.py
+
+        - task_key: raw_taxi_zones
+          job_cluster_key: pipeline_cluster
+          notebook_task:
+            notebook_path: ../src/01_raw/03_taxi_zones_raw.py
+
+        - task_key: raw_traffic_advisory
+          job_cluster_key: pipeline_cluster
+          notebook_task:
+            notebook_path: ../src/01_raw/04_traffic_advisory_raw.ipynb
+          libraries:
+            - pypi:
+                package: requests
+            - pypi:
+                package: beautifulsoup4
+
+        # --- Profile (Step 2): profile all raw tables before cleaning ---
+        - task_key: profile_source_data
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: raw_green_taxi
+            - task_key: raw_weather
+            - task_key: raw_taxi_zones
+            - task_key: raw_traffic_advisory
+          sql_task:                                 # CHECK: see assumption 2 above
+            file:
+              path: ../src/05_validation/01_profile_source_data.sql.dbquery
+            warehouse_id: <your-sql-warehouse-id>    # CHECK: required for sql_task
+
+        # --- Silver (Step 3): clean each dataset independently ---
+        - task_key: clean_green_taxi
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: profile_source_data
+          notebook_task:
+            notebook_path: ../src/02_clean/01_green_taxi_clean.ipynb
+
+        - task_key: clean_weather
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: profile_source_data
+          notebook_task:
+            notebook_path: ../src/02_clean/02_weather_clean.ipynb
+
+        - task_key: clean_taxi_zones
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: profile_source_data
+          notebook_task:
+            notebook_path: ../src/02_clean/03_taxi_zones_clean.ipynb
+
+        - task_key: clean_traffic_advisory
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: profile_source_data
+          notebook_task:
+            notebook_path: ../src/02_clean/04_traffic_advisory_clean.ipynb
+
+        # --- Silver validation (Step 4): one check per cleaned dataset ---
+        - task_key: validate_green_taxi
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: clean_green_taxi
+          notebook_task:
+            notebook_path: ../src/05_validation/02_green_taxi_validation.ipynb
+
+        - task_key: validate_weather
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: clean_weather
+          sql_task:                                 # CHECK: see assumption 2 above
+            file:
+              path: ../src/05_validation/03_weather_validation.dbquery
+            warehouse_id: <your-sql-warehouse-id>    # CHECK: required for sql_task
+
+        - task_key: validate_taxi_zones
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: clean_taxi_zones
+          notebook_task:
+            notebook_path: ../src/05_validation/04_taxi_zones_validation.ipynb
+
+        - task_key: validate_traffic_advisory
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: clean_traffic_advisory
+          notebook_task:
+            notebook_path: ../src/05_validation/05_traffic_advisory_validation.ipynb
+
+        # --- Gold (Step 5): dimensions first, fact_trip depends on all four ---
+        - task_key: dim_advisory
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: validate_traffic_advisory
+          notebook_task:
+            notebook_path: ../src/03_mart/01_dim_advisory_table.ipynb
+
+        - task_key: dim_date
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: validate_green_taxi
+          notebook_task:
+            notebook_path: ../src/03_mart/02_dim_date_table.ipynb
+
+        - task_key: dim_weather
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: validate_weather
+          notebook_task:
+            notebook_path: ../src/03_mart/03_dim_weather_table.ipynb
+
+        - task_key: dim_zone
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: validate_taxi_zones
+          notebook_task:
+            notebook_path: ../src/03_mart/04_dim_zone_table.ipynb
+
+        - task_key: fact_trip
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: dim_advisory
+            - task_key: dim_date
+            - task_key: dim_weather
+            - task_key: dim_zone
+          notebook_task:
+            notebook_path: ../src/03_mart/05_fact_trip_table.ipynb
+
+        # --- Visualisation (Step 6): Q1a/Q1b, Q2, Q3, Q4 + KPI summary ---
+        # CHECK (assumption 1): confirm these filenames against the repo -
+        # GitHub's file list truncated them; inferred from the matching
+        # bi_visualization table names in the README.
+        - task_key: bi_demand_and_popularity
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: fact_trip
+          notebook_task:
+            notebook_path: ../src/04_visualisation/01_bi_demand_and_popularity_analysis.ipynb
+
+        - task_key: bi_temporal_patterns
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: fact_trip
+          notebook_task:
+            notebook_path: ../src/04_visualisation/02_bi_temporal_patterns_and_behaviors.ipynb
+
+        - task_key: bi_weather_impact
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: fact_trip
+          notebook_task:
+            notebook_path: ../src/04_visualisation/03_bi_weather_impact_analysis.ipynb
+
+        - task_key: bi_traffic_advisory_impact
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: fact_trip
+          notebook_task:
+            notebook_path: ../src/04_visualisation/04_bi_traffic_advisory_and_incident_impact.ipynb
+
+        # --- DQ dashboard (Step 7): reflects the latest validation run ---
+        - task_key: clean_dq_checks_dashboard
+          job_cluster_key: pipeline_cluster
+          depends_on:
+            - task_key: bi_demand_and_popularity
+            - task_key: bi_temporal_patterns
+            - task_key: bi_weather_impact
+            - task_key: bi_traffic_advisory_impact
+          notebook_task:                            # CHECK: see assumption 3 above
+            notebook_path: ../src/05_validation/06_clean_dq_checks_dashboard
