@@ -4,12 +4,35 @@
 # environment_version = "5"
 # ///
 # DBTITLE 1,Ingest Taxi Zones
-from pyspark.sql import functions as F
 from datetime import datetime
 import os
 
-path = "/Volumes/workspace/default/ftw-b12-r2/groups/week-08/group-f/taxi_zones/"
-ALLOWED_EXT = {".csv", ".json", ".parquet"}
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+
+spark = SparkSession.builder.getOrCreate()
+
+# Path to taxi zones data
+taxi_zones_path = "/Volumes/workspace/default/ftw-b12-r2/groups/week-08/group-f/taxi_zones/"
+
+# ...
+
+if extension == ".csv":
+    df = spark.read.csv(full_path, header=True, inferSchema=True)
+elif extension == ".json":
+    df = spark.read.json(full_path)
+elif extension == ".parquet":
+    df = spark.read.parquet(full_path)
+else:
+    df = spark.read.csv(full_path, header=True, inferSchema=True)
+
+print("Schema:")
+df.printSchema()
+print(f"\nRow count: {df.count():,}")
+
+# ...
+
+spark.table("nyc_mobility.raw.taxi_zones").limit(20).show(truncate=False)
 
 # SAFE FILE DISCOVERY
 # Only pick up known data extensions, and require exactly one match
@@ -79,4 +102,4 @@ if prev_count is not None:
 
 # DBTITLE 1,Preview Taxi Zones Data
 # Preview the ingested taxi zones data
-display(spark.table("nyc_mobility.raw.taxi_zones").limit(20))
+spark.table("nyc_mobility.raw.taxi_zones").limit(20).show(truncate=False)
