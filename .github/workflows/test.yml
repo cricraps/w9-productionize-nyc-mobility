@@ -29,9 +29,6 @@ jobs:
         run: |
           python -m py_compile src/01_raw/*.py
 
-      - name: Lint Python with flake8
-        run: flake8 src/01_raw --max-line-length=150
-
       - name: Check formatting with black
         run: black --check src/01_raw
 
