@@ -36,9 +36,9 @@ else:
     # Try CSV as default
     df = spark.read.csv(full_path, header=True, inferSchema=True)
 
-print(f"Schema:")
+print("Schema:")
 df.printSchema()
-print(f"\nRow count: {df.count():,}")
+print("\nRow count: {df.count():,}")
 
 # Generate batch_id
 batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
